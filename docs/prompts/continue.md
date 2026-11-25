@@ -1,9 +1,9 @@
 # Prompt for any new chat after the first one
 
-Paste this (change the area name):
+Paste this into a new Claude Code chat (change the role name):
 
 ---
 
-continue Building
+continue Home Builder & AI Architect
 
-Read CLAUDE.md, docs/CONTRACTS.md and the last 15 lines of docs/LOG.md. Run `git checkout main && git pull`. Then tell me in 3 bullets where my area stands and suggest the next goal from my kickoff prompt in docs/prompts/. Wait for my OK before coding.
+Read CLAUDE.md, docs/CONTRACTS.md, my kickoff prompt in docs/prompts/ and the last 20 lines of docs/LOG.md. Sync with the team repo (`git checkout main && git pull upstream main && git push origin main`; the lead uses `git pull` only). Check if any of my open pull requests have comments or red checks and fix those first. Then tell me in 3 bullets where my area stands and suggest the next goal. Wait for my OK before coding.

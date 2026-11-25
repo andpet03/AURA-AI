@@ -1,0 +1,11 @@
+{
+  "_readme": "Which files each area may change. Used by the Claude Code scope guard (.claude/hooks/scope-guard.mjs) and by the PR check (scripts/check-scope.mjs). Branch names start with the area: world/..., build/..., social/..., activities/..., core/...",
+  "shared": ["docs/LOG.md", "docs/CONTRACTS.md", "docs/ideas/"],
+  "areas": {
+    "world": ["src/world/"],
+    "build": ["src/build/", "supabase/functions/", "public/models/"],
+    "social": ["src/social/", "supabase/schema.sql"],
+    "activities": ["src/activities/"],
+    "core": ["*"]
+  }
+}

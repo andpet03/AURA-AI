@@ -5,13 +5,17 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "smoke": "node tests/smoke.mjs",
+    "scope": "node scripts/check-scope.mjs",
+    "check": "npm run build && npm run smoke"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.2",
     "three": "^0.187.0"
   },
   "devDependencies": {
+    "playwright": "^1.65.1",
     "vite": "^8.3.8"
   },
   "private": true,

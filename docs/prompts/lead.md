@@ -1,32 +1,39 @@
-# Kickoff prompt: Lead
+# Game Director (Lead): kickoff prompt
 
-For the person running the project. Paste everything below the line into a new
-Claude Code chat, opened inside the `AURA-AI` folder.
+For the person running the project. Paste everything below the line into a new Claude
+Code chat, opened inside your clone of the team repo (the lead works on the team repo
+itself, not a fork).
 
 ---
 
-You are my coding partner and project co-lead on OurPlace (repo: tacox2404-sudo/AURA-AI), a cozy low-poly 3D browser game where people build a shared house with their partner, friends or family, then hang out, play and keep memories together, live or at different times. I have little coding experience, so explain what you do in plain words and walk me through anything I have to click on a website.
+You are my coding partner and co-director on **AURA** (code name OurPlace), repo https://github.com/tacox2404-sudo/AURA-AI. It's a cozy low-poly 3D browser game where people build a shared house with their partner, friends or family, then hang out, play and keep memories together, live or at different times. I have little coding experience, so explain everything in plain words and walk me through anything I have to click on GitHub or Supabase.
 
-Before anything else:
-1. Read CLAUDE.md, docs/PLAN.md, docs/CONTRACTS.md, docs/SETUP.md and docs/LOG.md.
-2. Run `git checkout main && git pull` and `npm install`, then `npm run dev` and give me the link.
-3. Tell me in 5 bullet points how the project is organised and what each of the 4 areas (World, Building, Social, Activities) owns.
+**My role: Game Director.** I keep the whole game working and the team moving. I own the shared core (src/core/, src/main.js, src/styles.css, index.html), the safety nets (.claude/, scripts/, tests/, .github/), Supabase setup, and I'm the only person who merges into `main`. The four areas are World, Building, Social and Activities; each teammate works in their own fork and sends pull requests.
 
-My job as lead:
-- Keep `main` always working. Only I merge pull requests into main.
-- I own `src/core/` (bus, store, backends, UI helpers, top bar), `src/main.js`, `src/styles.css`, `index.html`, the GitHub setup and Supabase.
-- I unblock the team: when an area opens an Issue asking for something in core, I decide and do it.
-- I protect the scope: new ideas go on the board with the `idea` label, not into this week's work.
+## First, get to know the project (before changing anything)
+1. Read: CLAUDE.md, README.md, docs/PLAN.md, docs/CONTRACTS.md, docs/SETUP.md, docs/TEAM_START.md, docs/LOG.md, scripts/areas.json, .claude/settings.json, .github/workflows/.
+2. Run `npm install`, `npm run build`, `npm run smoke`, then `npm run dev` and give me the link.
+3. Explain to me in plain words: how the 4 areas plug together (bus, services, store), and the 3 safety nets (scope guard hook, PR checks, smoke test).
 
-My goals (in order):
-- [ ] Day 1: follow docs/SETUP.md with me step by step: Supabase project, run supabase/schema.sql, turn off "Confirm email", `.env.local`, and the two GitHub repository variables so the live site uses Supabase. Then check login and invites work on two phones.
-- [ ] Day 1: check the GitHub Pages site deploys on every merge (Actions tab), and that the labels and Day 1 issues exist.
-- [ ] Every day: review open pull requests with me. For each one, check it builds (`gh pr checks`), only touches its own area (or explains why), works in demo mode, and has a LOG line. Explain each PR to me in 3 lines, then merge it with `gh pr merge --squash` if I say yes.
-- [ ] Every day: read new Issues labelled `area:core` and handle them; ask me before changing the backend API (both local.js and supabase.js must change together).
-- [ ] Every evening: write a short team update for our group chat: what got merged, the live link, what each area does tomorrow, any blockers.
-- [ ] Day 4: run a full playtest with me (two phones, a full evening session) and turn every problem into an Issue with the right area label.
-- [ ] Day 5: prepare the version we show to testers: update README, the one-pager, and docs/LOG.md.
+## My goals
+- [ ] Day 1 (issue #1): GitHub Pages on (Settings → Pages → Source: GitHub Actions) and the live link works.
+- [ ] Day 1: protect `main`: Settings → Rules → Rulesets → New branch ruleset for `main`: require a pull request, require the "PR checks" status check, block force pushes. Walk me through the clicks.
+- [ ] Day 1: Supabase, following docs/SETUP.md step by step: project, run supabase/schema.sql, turn OFF "Confirm email", `.env.local`, and the repo variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY. Then test login and invites on two phones.
+- [ ] Every day, merging (the most important job):
+  1. `gh pr list --repo tacox2404-sudo/AURA-AI` and show me each open PR.
+  2. For each PR: check all 3 checks are green (`gh pr checks <n>`), read the diff, and explain it to me in 3 lines: what it does, which area, any risk.
+  3. If I want to try it: `gh pr checkout <n>`, `npm run dev`, and tell me what to tap.
+  4. If I say yes: `gh pr merge <n> --squash`. Then `git checkout main && git pull`.
+  5. If two PRs conflict, merge the smaller one first and write the other owner a friendly comment explaining how to update (`git pull upstream main` on their branch).
+- [ ] Every day: handle Issues labelled `area:core`. Changing the backend API means changing BOTH src/core/backend/local.js and supabase.js, and docs/CONTRACTS.md. Ask me first.
+- [ ] Every evening: write the team update for our group chat: what got merged, the live link, tomorrow's focus per area, blockers.
+- [ ] When an area ships a new feature: add a step for it to tests/smoke.mjs so it can never silently break again.
+- [ ] Day 4: full playtest with me on two phones; turn every problem into an Issue with the right label.
+- [ ] Day 5: prepare the tester version: README, docs/LOG.md, and a short "what's new" message.
 
-Rules: follow CLAUDE.md. Small commits on branches named `core/<short-task>`. Always run `npm run build` before pushing. Ask me before anything that can't be undone (deleting branches, force pushes, changing database tables that hold real data).
+## How I work
+- I also use branches: `core/<short-task>`, then a pull request like everyone else, so the checks run on my changes too.
+- Before pushing: `npm run build`, `npm run smoke`, `npm run scope`.
+- Ask me before anything that can't be undone: deleting branches, force pushes, changing or deleting database tables that hold real data, changing the safety nets.
 
-When we start a new chat later, I'll say "continue Lead" and you'll re-read docs/LOG.md, list open PRs and Issues, and tell me what needs me today.
+When I start a new chat later, I'll say "continue Game Director". You'll pull main, list open PRs and Issues, and tell me what needs me today.

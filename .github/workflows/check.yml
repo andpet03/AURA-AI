@@ -1,14 +1,36 @@
-# Makes sure every pull request still builds, so main always works.
-name: Build check
+# Runs on every pull request. All three must pass before the lead merges:
+#  1. Build   - the game compiles
+#  2. Scope   - the PR only changes files of its area (branch name decides the area)
+#  3. Smoke   - a robot plays the game end to end in demo mode and fails on any crash
+name: PR checks
 on: pull_request
 jobs:
-  build:
+  checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
+      - name: 1. Build
+        run: npm run build
+      - name: 2. Scope (only your area's files)
+        run: node scripts/check-scope.mjs
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      - name: 3. Smoke test (the game still works)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run smoke
+      - name: Upload screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-screenshot
+          path: tests/last-smoke.png
+          if-no-files-found: ignore

@@ -1,6 +1,6 @@
-# OurPlace: rules for Claude (read this first, every session)
+# AURA (code name OurPlace): rules for Claude (read this first, every session)
 
-OurPlace is a cozy low-poly 3D browser game where people build a shared house with
+AURA is a cozy low-poly 3D browser game where people build a shared house with
 their partner, friends or family, then hang out, play and keep memories together,
 live or at different times. Read `docs/PLAN.md` for the scope, and the
 `docs/CONTRACTS.md` file before changing how areas talk to each other.
@@ -38,19 +38,42 @@ perfect-and-unfinished. We go broad first, then deep.
 7. **Before finishing:** run `npm run build` and fix every error. Then add 2-4 lines to
    `docs/LOG.md` (date, area, what changed, what's next).
 
-## Git workflow (do it for the user, explain each step briefly)
+## Git workflow: forks (do it for the user, explain each step briefly)
 
-- Start: `git checkout main && git pull`, then `git checkout -b <area>/<short-task>`
-  (example: `world/walk-animation`).
+Each teammate works in their OWN FORK of `tacox2404-sudo/AURA-AI` (the "upstream").
+Only the lead merges into upstream `main`, so nobody can break the live game by accident.
+
+- First time: the user forks on GitHub, then `git clone <their fork URL>` and
+  `git remote add upstream https://github.com/tacox2404-sudo/AURA-AI.git`.
+- Start every session: `git checkout main && git pull upstream main && git push origin main`,
+  then `git checkout -b <area>/<short-task>` (example: `world/walk-animation`).
+  The area prefix is required: world/, build/, social/, activities/ (lead: core/).
 - Commit small steps with clear messages.
-- Finish: `git push -u origin <branch>` and open a pull request with `gh pr create`,
-  labelled with the area. Main must always build.
+- Before pushing: `npm run build`, `npm run smoke`, `npm run scope`. All must pass.
+- Finish: `git push -u origin <branch>`, then open a pull request to upstream:
+  `gh pr create --repo tacox2404-sudo/AURA-AI --base main --title "..." --body "..."`
+  (or the "Compare & pull request" button on GitHub). Fill in the PR template.
+
+## Safety nets (don't fight them)
+
+- **Scope guard hook** (`.claude/hooks/scope-guard.mjs`): blocks edits on `main` and
+  edits outside your area, based on your branch name. If it blocks you, write an Issue
+  for the right area instead. Never edit the hook, `scripts/areas.json` or `.claude/`
+  unless you are the lead on a `core/` branch.
+- **PR checks** (`.github/workflows/check.yml`): build, scope and smoke test run on every
+  pull request. A red check = not merged. Fix it on your branch and push again.
+- **Smoke test** (`tests/smoke.mjs`): a robot plays the game. If you add a feature,
+  you may ask the lead to add a step for it.
 
 ## Commands
 
 - `npm install` once, then `npm run dev` (prints a local link; `--host` lets phones on
   the same Wi-Fi open it).
 - `npm run build` checks everything compiles.
+- `npm run smoke` plays the game automatically (after a build) and fails on any crash.
+  First time only: `npx playwright install chromium`.
+- `npm run scope` checks your branch only changed your area's files.
+- `npm run check` = build + smoke.
 - Two players locally: open two browser windows, create two accounts (demo mode syncs tabs).
 
 ## Style
