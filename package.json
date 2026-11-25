@@ -1,0 +1,19 @@
+{
+  "name": "ourplace",
+  "version": "1.0.0",
+  "description": "A cozy 3D home you build with your people",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.8"
+  },
+  "private": true,
+  "type": "module"
+}

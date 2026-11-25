@@ -1,0 +1,183 @@
+// BUILDING AREA - entry point. Owner: Building.
+// Build mode (place / rotate / move / delete), the Rooms panel, the AI room creator,
+// and the services other areas use to draw furniture and make houses.
+
+import { CATALOG, CATALOG_BY_ID, CATEGORIES } from './catalog.js';
+import { VIBES, HOUSE_TYPES, makeHouseDraft, makeRoom } from './templates.js';
+import { createAiRoom } from './aiRoom.js';
+import { canEdit, currentRoom, uid } from '../core/store.js';
+
+export function initBuild(ctx) {
+  const { bus, store, ui, backend } = ctx;
+  const { h } = ui;
+
+  // ---------- services for other areas ----------
+  ctx.provide('build.itemMesh', (item, theme) => {
+    const def = CATALOG_BY_ID[item.kind];
+    return def ? def.build(theme) : null;
+  });
+  ctx.provide('build.footprint', (item) => {
+    const def = CATALOG_BY_ID[item.kind];
+    const [w, d] = def?.size || [1, 1];
+    return item.rot % 2 ? [d, w] : [w, d];
+  });
+  ctx.provide('build.itemDef', (kind) => CATALOG_BY_ID[kind] || null);
+  ctx.provide('build.makeHouse', (answers) => makeHouseDraft(answers));
+  ctx.provide('build.houseTypes', () => HOUSE_TYPES);
+  ctx.provide('build.vibes', () => VIBES);
+
+  const save = (house) => ctx.use('house.save')(house);
+
+  // ---------- build mode ----------
+  let selectedKind = null;   // palette item to place
+  let selectedItemId = null; // placed item being edited
+  let moving = false;
+  let category = CATEGORIES[0];
+  const bar = h('div', { class: 'buildbar hidden' });
+  ui.root.append(bar);
+
+  function enterBuild() {
+    if (!canEdit(store.get().role)) return ui.toast('Only housemates can build here');
+    store.set({ mode: 'build' });
+  }
+  function exitBuild() { selectedKind = null; selectedItemId = null; moving = false; store.set({ mode: 'play' }); }
+
+  function renderBar() {
+    const s = store.get();
+    const on = s.mode === 'build';
+    bar.classList.toggle('hidden', !on);
+    ui.setDockVisible(!on);
+    if (!on) return;
+    const room = currentRoom(s);
+    const sel = room?.items.find((i) => i.id === selectedItemId);
+    const selBar = sel ? h('div', { class: 'sel-bar' },
+      h('b', {}, CATALOG_BY_ID[sel.kind]?.name || sel.kind),
+      h('button', { onclick: () => editItem(sel, (it) => { it.rot = (it.rot + 1) % 4; }) }, '⟳ Rotate'),
+      h('button', { class: moving ? 'on' : '', onclick: () => { moving = !moving; renderBar(); ui.toast(moving ? 'Tap the floor to move it' : 'Move cancelled'); } }, '✥ Move'),
+      CATALOG_BY_ID[sel.kind]?.activity === 'portal' || CATALOG_BY_ID[sel.kind]?.activity === 'links'
+        ? h('button', { onclick: () => labelPrompt(sel) }, '🔗 Link') : null,
+      h('button', { class: 'danger', onclick: () => removeItem(sel) }, '🗑 Delete'),
+      h('button', { onclick: () => { selectedItemId = null; moving = false; renderBar(); } }, 'Done'),
+    ) : null;
+    bar.replaceChildren(
+      h('div', { class: 'buildbar-top' },
+        h('div', { class: 'chips' }, ...CATEGORIES.map((c) => h('button', { class: 'chip' + (c === category ? ' active' : ''), onclick: () => { category = c; renderBar(); } }, c))),
+        h('button', { class: 'primary small', onclick: exitBuild }, '✓ Done')),
+      selBar || h('div', { class: 'palette' }, ...CATALOG.filter((c) => c.cat === category).map((c) =>
+        h('button', { class: 'pal-item' + (c.id === selectedKind ? ' active' : ''), onclick: () => { selectedKind = selectedKind === c.id ? null : c.id; renderBar(); if (selectedKind) ui.toast(`Tap the floor to place: ${c.name}`); } },
+          h('span', {}, c.name), c.activity ? h('small', {}, '✨ ' + c.activity) : null))),
+    );
+  }
+
+  function editItem(item, fn) {
+    const s = store.get();
+    const house = structuredClone(s.house);
+    const room = house.rooms.find((r) => r.id === s.roomId);
+    const it = room.items.find((i) => i.id === item.id);
+    fn(it, room);
+    save(house);
+  }
+  function removeItem(item) {
+    const s = store.get();
+    const house = structuredClone(s.house);
+    const room = house.rooms.find((r) => r.id === s.roomId);
+    room.items = room.items.filter((i) => i.id !== item.id);
+    selectedItemId = null; moving = false;
+    save(house); renderBar();
+  }
+  async function labelPrompt(item) {
+    const res = await ui.ask({ title: '🔗 Link this object', text: 'A watch party, a game, a playlist, a booking page…', ok: 'Save', fields: [
+      { label: 'Website', value: item.data?.url || 'https://' }, { label: 'Label shown when tapped', value: item.data?.label || '' }] });
+    if (!res) return;
+    editItem(item, (it) => { it.data = { ...(it.data || {}), url: res[0].trim(), label: res[1].trim() }; });
+  }
+
+  function fitsAt(room, kind, rot, x, z, ignoreId) {
+    const def = CATALOG_BY_ID[kind];
+    const [w, d] = rot % 2 ? [def.size[1], def.size[0]] : def.size;
+    if (x < 0 || z < 0 || x + w > room.size[0] || z + d > room.size[1]) return false;
+    if (def.floorOnly) return true;
+    return !room.items.some((o) => {
+      if (o.id === ignoreId || CATALOG_BY_ID[o.kind]?.floorOnly) return false;
+      const od = CATALOG_BY_ID[o.kind]; if (!od) return false;
+      const [ow, odp] = o.rot % 2 ? [od.size[1], od.size[0]] : od.size;
+      return x < o.x + ow && x + w > o.x && z < o.z + odp && z + d > o.z;
+    });
+  }
+
+  bus.on('world:tap', ({ target, cell, item }) => {
+    const s = store.get();
+    if (s.mode !== 'build') return;
+    const room = currentRoom(s);
+    if (!room) return;
+    if (target === 'item' && !moving) { selectedItemId = item.id; selectedKind = null; renderBar(); return; }
+    if (!cell) return;
+    if (moving && selectedItemId) {
+      const it = room.items.find((i) => i.id === selectedItemId);
+      if (!fitsAt(room, it.kind, it.rot, cell.x, cell.z, it.id)) return ui.toast("It doesn't fit there");
+      editItem(it, (x) => { x.x = cell.x; x.z = cell.z; });
+      moving = false; renderBar(); return;
+    }
+    if (selectedKind) {
+      if (!fitsAt(room, selectedKind, 0, cell.x, cell.z)) return ui.toast("It doesn't fit there");
+      const house = structuredClone(s.house);
+      house.rooms.find((r) => r.id === room.id).items.push({ id: uid('i_'), kind: selectedKind, x: cell.x, z: cell.z, rot: 0 });
+      save(house);
+      bus.emit('points:award', { amount: 1, reason: 'decorated' });
+    }
+  });
+
+  store.subscribe((s, prev) => {
+    if (s.mode !== prev.mode || s.house !== prev.house || s.roomId !== prev.roomId) renderBar();
+    if (s.role !== prev.role) ui.refreshDock(s);
+  });
+
+  // ---------- Rooms panel ----------
+  function openRooms() {
+    const s = store.get();
+    const editor = canEdit(s.role);
+    const list = h('div', { class: 'list' }, ...s.house.rooms.map((r) => h('div', { class: 'row' },
+      h('button', { class: 'row-main' + (r.id === s.roomId ? ' active' : ''), onclick: () => { ui.closePanel(); bus.emit('room:goto', { roomId: r.id }); } },
+        h('span', { class: 'swatch', style: { background: r.theme.accent } }), r.name, h('small', {}, `${r.items.length} items`)),
+      editor ? h('button', { class: 'icon-btn', title: 'Rename', onclick: () => renameRoom(r) }, '✎') : null,
+      editor && s.house.rooms.length > 1 ? h('button', { class: 'icon-btn', title: 'Delete', onclick: () => deleteRoom(r) }, '🗑') : null)));
+
+    const aiInput = h('input', { placeholder: 'e.g. cozy movie room, travel planning, spa…', maxlength: 80 });
+    const vibeSel = h('select', {}, ...Object.entries(VIBES).map(([k, v]) => h('option', { value: k, selected: k === s.house.vibe }, v.label)));
+    const createBtn = h('button', { class: 'primary', onclick: async () => {
+      const text = aiInput.value.trim();
+      if (!text) return ui.toast('Describe the room first');
+      createBtn.disabled = true; createBtn.textContent = 'Creating…';
+      const { room, usedAi } = await createAiRoom(backend, text, vibeSel.value);
+      addRoom(room);
+      ui.toast(usedAi ? `✨ AI made "${room.name}"` : `Made "${room.name}" (keyword mode, no AI key yet)`);
+    } }, '✨ Create room');
+    const emptyBtn = h('button', { onclick: () => addRoom(makeRoom({ name: aiInput.value.trim() || 'New Room', vibe: vibeSel.value, kinds: ['rug', 'lamp'] })) }, 'Empty room');
+
+    ui.panel({ title: 'Rooms', body: h('div', {}, list,
+      editor ? h('div', { class: 'card' }, h('h4', {}, 'Add a room'), h('p', { class: 'muted' }, 'Describe it and the AI builds it from the furniture catalog.'), aiInput, h('label', {}, 'Vibe ', vibeSel), h('div', { class: 'row-btns' }, createBtn, emptyBtn))
+        : h('p', { class: 'muted' }, 'Guests can visit and play. Ask a housemate to add rooms.')) });
+  }
+  function addRoom(room) {
+    const house = structuredClone(store.get().house);
+    house.rooms.push(room);
+    save(house).then(() => { ui.closePanel(); bus.emit('room:goto', { roomId: room.id }); });
+    bus.emit('points:award', { amount: 15, reason: 'created a room' });
+  }
+  async function renameRoom(r) {
+    const res = await ui.ask({ title: 'Rename room', fields: [{ value: r.name }], ok: 'Save' });
+    const name = res?.[0]?.trim(); if (!name) return;
+    const house = structuredClone(store.get().house);
+    house.rooms.find((x) => x.id === r.id).name = name.slice(0, 30);
+    save(house).then(openRooms);
+  }
+  async function deleteRoom(r) {
+    if (!(await ui.confirm(`Delete "${r.name}"?`, 'Everything in this room will be removed.', 'Delete'))) return;
+    const house = structuredClone(store.get().house);
+    house.rooms = house.rooms.filter((x) => x.id !== r.id);
+    save(house).then(() => { bus.emit('room:goto', { roomId: house.rooms[0].id }); openRooms(); });
+  }
+
+  ui.addDockButton({ id: 'rooms', icon: '🚪', label: 'Rooms', onClick: openRooms, order: 10 });
+  ui.addDockButton({ id: 'build', icon: '🛠️', label: 'Build', onClick: enterBuild, order: 20, visible: (s) => !s || canEdit(s.role) });
+}
